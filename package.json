@@ -1,0 +1,8 @@
+{
+  "name": "mezmo-utility",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env mezmo-logs.mjs"
+  }
+}
