@@ -19,6 +19,22 @@ const MAX_PAGE_SIZE = 10_000;
 /** @type {Map<string, { filename: string, content: string }>} */
 const downloads = new Map();
 
+const COMPACT_STRIP_FIELDS = new Set([
+  "_line", "message",
+  "_key", "_account", "_bid", "_cluster",
+  "_file", "_ingester", "_ip", "_logtype",
+  "_mezmo_line_size", "_originating_user_agent",
+  "_search_index",
+]);
+
+function compactLine(line) {
+  const out = {};
+  for (const [k, v] of Object.entries(line)) {
+    if (!COMPACT_STRIP_FIELDS.has(k)) out[k] = v;
+  }
+  return out;
+}
+
 // ─── HTML UI ────────────────────────────────────────────────────────────────
 
 const HTML = `<!DOCTYPE html>
@@ -206,6 +222,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
       </div>
     </details>
 
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="compact" checked>
+      <span style="font-size:14px">Compact output <span class="hint">(strip Mezmo metadata &amp; duplicate fields)</span></span>
+    </label>
+
     <button type="submit" id="exportBtn">Export Logs</button>
   </form>
 
@@ -276,6 +297,8 @@ form.addEventListener("submit", (e) => {
     const v = document.getElementById(id).value.trim();
     if (v) params.set(id, v);
   }
+
+  if (document.getElementById("compact").checked) params.set("compact", "1");
 
   exportBtn.disabled = true;
   statusEl.classList.remove("hidden");
@@ -352,6 +375,7 @@ async function handleExport(req, res, params) {
     return;
   }
 
+  const compact = params.get("compact") === "1";
   const apps = params.get("apps");
   const hosts = params.get("hosts");
   const levels = params.get("levels");
@@ -423,7 +447,7 @@ async function handleExport(req, res, params) {
     const toDate = formatDateForFilename(new Date(parseInt(to) * 1000));
     const filename = `mezmo-${fromDate}_to_${toDate}.log`;
 
-    const content = allLines.map((l) => JSON.stringify(l)).join("\n");
+    const content = allLines.map((l) => JSON.stringify(compact ? compactLine(l) : l)).join("\n");
     downloads.set(token, { filename, content });
 
     // Auto-cleanup after 5 minutes
